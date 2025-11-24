@@ -34,7 +34,7 @@ export const RequestLinesTable: React.FC<RequestLinesTableProps> = ({
     value: string
   ) => {
     const line = lines[index];
-    let newValue: any = value;
+    let newValue: number | string = value;
 
     if (field === 'unit_price' || field === 'amount' || field === 'total_price') {
       newValue = Number(value) || 0;

@@ -1,47 +1,89 @@
 // src/app/requests/[id]/page.tsx
 
-'use client';
-
-// Später: getProcurementRequest(id) nutzen, um Details vom Backend zu holen,
-// Status-Badge + Status-Update-Controls über shadcn components.
-
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import Link from 'next/link';
+import { RequestDetail } from '@/components/RequestDetail';
+import { ApiError, getProcurementRequest } from '@/lib/api';
+import type { ProcurementRequest } from '@/lib/types';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface RequestDetailPageProps {
   params: { id: string };
 }
 
-export default function RequestDetailPage({ params }: RequestDetailPageProps) {
+export default async function RequestDetailPage({ params }: RequestDetailPageProps) {
   const { id } = params;
 
-  return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900">
-          Request detail
-        </h1>
-        <p className="text-sm text-slate-600">
-          This page will show all fields and line items for request <code>{id}</code>.
-        </p>
-      </header>
+  let request: ProcurementRequest | null = null;
+  let fetchError: unknown = null;
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Request #{id}</CardTitle>
-          <CardDescription>
-            Detailed view not implemented yet.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-slate-500">
-          TODO for coding agent:
-          <ul className="mt-2 list-disc pl-5">
-            <li>Fetch request by ID from backend.</li>
-            <li>Render general info (title, vendor, department, total cost).</li>
-            <li>Render line items using <code>Table</code>.</li>
-            <li>Render status (with a shadcn <code>Badge</code>) &amp; controls to change it.</li>
-          </ul>
-        </CardContent>
-      </Card>
-    </div>
+  try {
+    request = await getProcurementRequest(id);
+  } catch (error) {
+    fetchError = error;
+    console.error('Failed to fetch request detail', error);
+  }
+
+  if (request) {
+    return <RequestDetail request={request} />;
+  }
+
+  if (fetchError instanceof ApiError && fetchError.status === 404) {
+    return <NotFoundState id={id} />;
+  }
+
+  const message =
+    fetchError instanceof ApiError
+      ? fetchError.message
+      : 'Something went wrong while loading this request.';
+
+  return <ErrorState message={message} id={id} />;
+}
+
+function NotFoundState({ id }: { id: string }) {
+  return (
+    <Card className="border-dashed">
+      <CardHeader>
+        <CardTitle className="text-base">Request not found</CardTitle>
+        <CardDescription>
+          We could not find a procurement request with ID {id}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex gap-2">
+        <Button asChild variant="outline">
+          <Link href="/requests">Back to all requests</Link>
+        </Button>
+        <Button asChild>
+          <Link href="/request/new">Create a new request</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ErrorState({ message, id }: { message: string; id: string }) {
+  return (
+    <Card className="border-red-200 bg-red-50">
+      <CardHeader>
+        <CardTitle className="text-base text-red-800">Could not load request</CardTitle>
+        <CardDescription className="text-red-700">
+          {message} (ID: {id})
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex gap-2">
+        <Button asChild variant="outline">
+          <Link href={`/requests/${id}`}>Retry</Link>
+        </Button>
+        <Button asChild variant="ghost">
+          <Link href="/requests">Back to list</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,66 +1,150 @@
 // src/lib/api.ts
 
-import type { ProcurementRequest, OfferExtractionResult } from '@/lib/types';
+import type {
+  ProcurementRequest,
+  OfferExtractionResult,
+  RequestStatus,
+  OrderLine,
+} from '@/lib/types';
 
-// TODO: adjust base URL for FastAPI backend (e.g. http://localhost:8000/api)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000/api';
+
+export class ApiError extends Error {
+  status: number;
+  details?: unknown;
+
+  constructor(status: number, message: string, details?: unknown) {
+    super(message);
+    this.status = status;
+    this.details = details;
+  }
+}
+
+const ensureBaseUrl = (): string => {
+  if (!API_BASE_URL) {
+    throw new Error(
+      'NEXT_PUBLIC_API_BASE_URL is not configured. Set it to the FastAPI base URL.'
+    );
+  }
+  return API_BASE_URL;
+};
+
+const buildUrl = (path: string, query?: URLSearchParams): string => {
+  const base = ensureBaseUrl();
+  const qs = query?.toString();
+  return qs ? `${base}${path}?${qs}` : `${base}${path}`;
+};
+
+const handleApiResponse = async <T>(response: Response): Promise<T> => {
+  let data: unknown = null;
+  try {
+    data = await response.clone().json();
+  } catch {
+    // Ignore JSON parse errors; data stays null.
+  }
+
+  if (!response.ok) {
+    const message =
+      (typeof data === 'object' &&
+        data !== null &&
+        'detail' in data &&
+        typeof (data as { detail: unknown }).detail === 'string' &&
+        (data as { detail: string }).detail) ||
+      (typeof data === 'object' &&
+        data !== null &&
+        'message' in data &&
+        typeof (data as { message: unknown }).message === 'string' &&
+        (data as { message: string }).message) ||
+      'Request to backend failed';
+
+    throw new ApiError(response.status, message, data);
+  }
+
+  return data as T;
+};
+
+export type CreateProcurementRequestPayload = {
+  requestor_name: string;
+  title: string;
+  vendor_name: string;
+  vendor_vat_id: string;
+  department: string;
+  commodity_group: string | null;
+  order_lines: OrderLine[];
+  total_cost: number;
+};
+
+export interface ProcurementRequestFilters {
+  status?: RequestStatus;
+  department?: string;
+  search?: string;
+}
 
 export async function createProcurementRequest(
-  payload: Omit<ProcurementRequest, 'id' | 'status' | 'created_at' | 'updated_at'>
+  payload: CreateProcurementRequestPayload
 ): Promise<ProcurementRequest> {
-  // TODO: Implement real POST /requests call to FastAPI
-  const res = await fetch(`${API_BASE_URL}/requests`, {
+  const response = await fetch(buildUrl('/requests'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    cache: 'no-store',
   });
 
-  if (!res.ok) {
-    throw new Error('Failed to create procurement request');
-  }
-
-  return res.json();
+  return handleApiResponse<ProcurementRequest>(response);
 }
 
-export async function listProcurementRequests(): Promise<ProcurementRequest[]> {
-  // TODO: Implement real GET /requests call to FastAPI
-  const res = await fetch(`${API_BASE_URL}/requests`, {
+export async function listProcurementRequests(
+  filters?: ProcurementRequestFilters
+): Promise<ProcurementRequest[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.department) params.set('department', filters.department);
+  if (filters?.search) params.set('search', filters.search);
+
+  const response = await fetch(buildUrl('/requests', params), {
     next: { revalidate: 5 },
   });
 
-  if (!res.ok) {
-    throw new Error('Failed to fetch procurement requests');
-  }
-
-  return res.json();
+  return handleApiResponse<ProcurementRequest[]>(response);
 }
 
-export async function getProcurementRequest(id: string): Promise<ProcurementRequest> {
-  // TODO: Implement real GET /requests/{id} call to FastAPI
-  const res = await fetch(`${API_BASE_URL}/requests/${id}`, {
+export async function getProcurementRequest(
+  id: string
+): Promise<ProcurementRequest> {
+  const response = await fetch(buildUrl(`/requests/${encodeURIComponent(id)}`), {
     next: { revalidate: 5 },
   });
 
-  if (!res.ok) {
-    throw new Error('Failed to fetch procurement request');
-  }
+  return handleApiResponse<ProcurementRequest>(response);
+}
 
-  return res.json();
+export async function updateRequestStatus(
+  id: string,
+  status: RequestStatus
+): Promise<ProcurementRequest> {
+  const response = await fetch(
+    buildUrl(`/requests/${encodeURIComponent(id)}/status`),
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+      cache: 'no-store',
+    }
+  );
+
+  return handleApiResponse<ProcurementRequest>(response);
 }
 
 export async function parseOffer(file: File): Promise<OfferExtractionResult> {
-  // TODO: Implement real POST /offers/parse call to FastAPI
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE_URL}/offers/parse`, {
+  const response = await fetch(buildUrl('/offers/parse'), {
     method: 'POST',
     body: formData,
+    cache: 'no-store',
   });
 
-  if (!res.ok) {
-    throw new Error('Failed to parse offer document');
-  }
-
-  return res.json();
+  return handleApiResponse<OfferExtractionResult>(response);
 }
