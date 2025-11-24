@@ -1,7 +1,6 @@
-# app/clients/openai_client.py
-
-from typing import Any, Dict
 import json
+import logging
+from typing import Any, Dict
 
 from openai import OpenAI
 
@@ -20,6 +19,7 @@ class OpenAIClient:
 
     def __init__(self, api_key: str | None = None) -> None:
         self._client = OpenAI(api_key=api_key or settings.openai_api_key)
+        self._logger = logging.getLogger("app.offers")
 
     def extract_offer(self, offer_text: str) -> Dict[str, Any]:
         """
@@ -34,6 +34,8 @@ class OpenAIClient:
         - total_cost: float | None
         - commodity_group_suggestion: str | None
         """
+        self._logger.debug("Calling OpenAI for offer extraction (chars=%s)", len(offer_text))
+
         system_prompt = (
             "You are an expert procurement extraction engine. "
             "Given the full plain-text content of a vendor offer (a quote) in German or English, "
@@ -80,18 +82,16 @@ class OpenAIClient:
 
             Now parse the following vendor offer:
 
-            \"\"\"{offer_text}\"\"\"
+            \"\"\"{offer_text}\"\"\"\n
             """
 
         response = self._client.chat.completions.create(
-            model="gpt-5.1",  # adjust if needed
+            model="gpt-5.1",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            # Force JSON output
             response_format={"type": "json_object"},
-            # temperature=0.1,
         )
 
         content = response.choices[0].message.content
@@ -101,8 +101,12 @@ class OpenAIClient:
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            # Include a short snippet of the model output to help debugging
             snippet = content[:500]
+            self._logger.error(
+                "OpenAI returned invalid JSON for offer extraction: %s (snippet=%s)",
+                exc,
+                snippet,
+            )
             raise RuntimeError(
                 f"OpenAI returned invalid JSON for offer extraction: {exc}. "
                 f"Snippet: {snippet}"

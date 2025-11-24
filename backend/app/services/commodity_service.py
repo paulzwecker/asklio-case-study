@@ -19,12 +19,22 @@ class CommodityService:
 
         if "adobe" in text or "software" in text:
             return "IT - Software"
-        if "macbook" in text or "laptop" in text or "hardware" in text:
+        if (
+            "macbook" in text
+            or "laptop" in text
+            or "notebook" in text
+            or "hardware" in text
+        ):
             return "IT - Hardware"
-        if "campaign" in text or "ads" in text or "marketing" in text:
+        if (
+            "campaign" in text
+            or "ads" in text
+            or "facebook" in text
+            or "instagram" in text
+            or "marketing" in text
+        ):
             return "Marketing & Advertising"
 
-        # Fallback
         return "Other"
 
 

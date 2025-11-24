@@ -1,6 +1,6 @@
-# app/services/request_service.py
-
-from typing import Optional, List
+import logging
+from decimal import Decimal
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import Depends
@@ -10,6 +10,8 @@ from app.models.status import RequestStatus
 from app.repositories.base import RequestRepository
 from app.repositories.memory_requests import InMemoryRequestRepository
 from app.services.commodity_service import CommodityService, get_commodity_service
+
+_REQUEST_REPOSITORY: Optional[InMemoryRequestRepository] = None
 
 
 class RequestService:
@@ -22,6 +24,7 @@ class RequestService:
     ) -> None:
         self._repo = repository
         self._commodity_service = commodity_service
+        self._logger = logging.getLogger("app.requests")
 
     def list_requests(
         self,
@@ -29,53 +32,78 @@ class RequestService:
         department: Optional[str] = None,
         search: Optional[str] = None,
     ) -> List[ProcurementRequest]:
-        return self._repo.list(
+        """Return requests filtered by optional status, department, and search query."""
+        results = self._repo.list(
             status_filter=status_filter,
             department=department,
             search=search,
         )
+        self._logger.debug("List returned %s requests", len(results))
+        return results
 
     def get_request(self, request_id: UUID) -> Optional[ProcurementRequest]:
+        """Retrieve a request by id or return None."""
         return self._repo.get(request_id)
 
     def create_request(self, payload: ProcurementRequestCreate) -> ProcurementRequest:
-        # Falls Commodity Group fehlt: vom Service vorschlagen lassen
+        """Create a new procurement request with derived data."""
         if not payload.commodity_group:
-            suggested = self._commodity_service.suggest_for_request(payload)
-            payload.commodity_group = suggested
+            payload.commodity_group = self._commodity_service.suggest_for_request(
+                payload
+            )
 
-        # Optional: Validate total_cost vs. sum of order_lines
-        calculated_total = sum([float(line.total_price) for line in payload.order_lines])
-        if float(payload.total_cost) != calculated_total:
-            # für MVP: einfach überschreiben
+        calculated_total = sum(
+            (Decimal(str(line.total_price)) for line in payload.order_lines),
+            Decimal("0"),
+        )
+        current_total = Decimal(str(payload.total_cost))
+        if current_total != calculated_total:
             payload.total_cost = calculated_total
 
-        return self._repo.create(payload)
+        created = self._repo.create(payload)
+        self._logger.info(
+            "Created procurement request %s for vendor %s (total=%s)",
+            created.id,
+            created.vendor_name,
+            created.total_cost,
+        )
+        return created
 
     def update_status(
         self,
         request_id: UUID,
         new_status: RequestStatus,
     ) -> Optional[ProcurementRequest]:
+        """Update the status of an existing request."""
         req = self._repo.get(request_id)
         if req is None:
             return None
         if req.status == new_status:
             return req
 
+        old_status = req.status
         req.status = new_status
-        return self._repo.update(req)
+        updated = self._repo.update(req)
+        self._logger.info(
+            "Status change for request %s: %s -> %s",
+            request_id,
+            old_status,
+            new_status,
+        )
+        return updated
 
-
-# Dependency wiring (für FastAPI Depends)
 
 def get_request_repository() -> RequestRepository:
-    # später einfach durch Postgres-Repo ersetzen
-    return InMemoryRequestRepository()
+    """Provide a singleton-like repository instance."""
+    global _REQUEST_REPOSITORY
+    if _REQUEST_REPOSITORY is None:
+        _REQUEST_REPOSITORY = InMemoryRequestRepository()
+    return _REQUEST_REPOSITORY
 
 
 def get_request_service(
     repo: RequestRepository = Depends(get_request_repository),
     commodity_service: CommodityService = Depends(get_commodity_service),
 ) -> RequestService:
+    """FastAPI dependency wiring for RequestService."""
     return RequestService(repository=repo, commodity_service=commodity_service)

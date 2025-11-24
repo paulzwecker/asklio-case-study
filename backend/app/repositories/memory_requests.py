@@ -1,5 +1,4 @@
-# app/repositories/memory_requests.py
-
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID
@@ -14,6 +13,7 @@ class InMemoryRequestRepository(RequestRepository):
 
     def __init__(self) -> None:
         self._store: Dict[UUID, ProcurementRequest] = {}
+        self._logger = logging.getLogger("app.requests")
 
     def list(
         self,
@@ -21,6 +21,7 @@ class InMemoryRequestRepository(RequestRepository):
         department: Optional[str] = None,
         search: Optional[str] = None,
     ) -> List[ProcurementRequest]:
+        """Return all requests that match optional filters."""
         items = list(self._store.values())
 
         if status_filter is not None:
@@ -37,18 +38,23 @@ class InMemoryRequestRepository(RequestRepository):
                 if s in r.title.lower() or s in r.vendor_name.lower()
             ]
 
-        # TODO: pagination if needed
+        self._logger.debug("Repository list returning %s items", len(items))
         return items
 
     def get(self, request_id: UUID) -> Optional[ProcurementRequest]:
+        """Return a request by id if present."""
         return self._store.get(request_id)
 
     def create(self, payload: ProcurementRequestCreate) -> ProcurementRequest:
-        req = ProcurementRequest(**payload.dict())
+        """Store a new procurement request."""
+        req = ProcurementRequest(**payload.model_dump())
         self._store[req.id] = req
+        self._logger.debug("Stored new request %s", req.id)
         return req
 
     def update(self, request: ProcurementRequest) -> ProcurementRequest:
+        """Persist updates to an existing request."""
         request.updated_at = datetime.utcnow()
         self._store[request.id] = request
+        self._logger.debug("Updated request %s", request.id)
         return request

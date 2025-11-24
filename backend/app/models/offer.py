@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, condecimal
+from pydantic import BaseModel, Field, condecimal
 
 from app.models.order_line import OrderLine
 
@@ -22,6 +22,6 @@ class OfferExtractionResult(BaseModel):
     vendor_vat_id: Optional[str] = None
     department: Optional[str] = None
     title: Optional[str] = None
-    order_lines: List[OrderLine] = []
+    order_lines: List[OrderLine] = Field(default_factory=list)
     total_cost: Optional[condecimal(max_digits=14, decimal_places=2)] = None
     commodity_group_suggestion: Optional[str] = None

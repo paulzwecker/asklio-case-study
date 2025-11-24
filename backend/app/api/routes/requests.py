@@ -1,15 +1,20 @@
-# app/api/routes/requests.py
-
+import logging
 from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from app.models.request import ProcurementRequest, ProcurementRequestCreate
 from app.models.status import RequestStatus
 from app.services.request_service import RequestService, get_request_service
 
 router = APIRouter(prefix="/requests", tags=["requests"])
+logger = logging.getLogger("app.requests")
+
+
+class StatusUpdatePayload(BaseModel):
+    status: RequestStatus
 
 
 @router.get(
@@ -23,11 +28,19 @@ async def list_requests(
     search: str | None = None,
     service: RequestService = Depends(get_request_service),
 ) -> List[ProcurementRequest]:
-    return service.list_requests(
+    results = service.list_requests(
         status_filter=status_filter,
         department=department,
         search=search,
     )
+    logger.debug(
+        "Listed requests with filters status=%s department=%s search=%s -> %s items",
+        status_filter,
+        department,
+        search,
+        len(results),
+    )
+    return results
 
 
 @router.post(
@@ -40,7 +53,14 @@ async def create_request(
     payload: ProcurementRequestCreate,
     service: RequestService = Depends(get_request_service),
 ) -> ProcurementRequest:
-    return service.create_request(payload)
+    created = service.create_request(payload)
+    logger.info(
+        "Created request %s for vendor %s with total %s",
+        created.id,
+        created.vendor_name,
+        created.total_cost,
+    )
+    return created
 
 
 @router.get(
@@ -65,10 +85,15 @@ async def get_request(
 )
 async def update_request_status(
     request_id: UUID,
-    new_status: RequestStatus,
+    payload: StatusUpdatePayload,
     service: RequestService = Depends(get_request_service),
 ) -> ProcurementRequest:
-    updated = service.update_status(request_id, new_status)
+    updated = service.update_status(request_id, payload.status)
     if updated is None:
         raise HTTPException(status_code=404, detail="Request not found")
+    logger.info(
+        "Updated request %s status to %s",
+        request_id,
+        payload.status,
+    )
     return updated

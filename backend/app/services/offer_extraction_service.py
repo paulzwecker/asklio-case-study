@@ -1,10 +1,8 @@
-# app/services/offer_extraction_service.py
-
+import logging
 from io import BytesIO
 
 import anyio
 from fastapi import UploadFile
-
 from pypdf import PdfReader
 
 from app.clients.openai_client import OpenAIClient
@@ -13,24 +11,14 @@ from app.models.order_line import OrderLine
 
 
 class OfferExtractionService:
-    """
-    Service responsible for:
-    - Reading the uploaded PDF.
-    - Extracting text from all pages.
-    - Sending text to OpenAIClient for structured parsing.
-    - Mapping the raw dict into OfferExtractionResult (Pydantic model).
-    """
+    """Extract structured offer data from uploaded PDF documents."""
 
     def __init__(self, openai_client: OpenAIClient) -> None:
         self._openai = openai_client
+        self._logger = logging.getLogger("app.offers")
 
     def _extract_pdf_text(self, file_bytes: bytes) -> str:
-        """
-        Extract plain text from the PDF using pypdf.
-
-        This is intentionally simple; it assumes digital PDFs
-        (no OCR), which matches the case study.
-        """
+        """Extract plain text from the PDF using pypdf."""
         reader = PdfReader(BytesIO(file_bytes))
         pages: list[str] = []
 
@@ -42,29 +30,30 @@ class OfferExtractionService:
         return "\n\n".join(pages).strip()
 
     async def extract(self, file: UploadFile) -> OfferExtractionResult:
-        # 1. PDF lesen
+        """Read PDF content, call OpenAI, and map the response."""
         raw_bytes = await file.read()
+        self._logger.debug("Read %s bytes from uploaded file %s", len(raw_bytes), file.filename)
+
         pdf_text = self._extract_pdf_text(raw_bytes)
         if not pdf_text:
-            # Falls Text-Extraktion komplett scheitert
+            self._logger.warning("No text extracted from uploaded PDF %s", file.filename)
             return OfferExtractionResult(order_lines=[])
 
-        # 2. OpenAI aufrufen (blocking → in Thread ausführen)
         raw_dict = await anyio.to_thread.run_sync(
             self._openai.extract_offer, pdf_text
         )
 
-        # 3. Dict in OfferExtractionResult gießen
-        #    Pydantic übernimmt Typkonvertierung (Floats → Decimal etc.)
         order_lines_raw = raw_dict.get("order_lines") or []
         order_lines: list[OrderLine] = []
         for i, line in enumerate(order_lines_raw):
             try:
                 order_lines.append(OrderLine(**line))
             except Exception as exc:  # noqa: BLE001
-                # Defensive: Fehlerhafte Einzelzeilen überspringen, Rest behalten
-                # In einem realen System könntest du hier loggen.
-                continue
+                self._logger.warning(
+                    "Skipping invalid order line at index %s: %s",
+                    i,
+                    exc,
+                )
 
         result = OfferExtractionResult(
             vendor_name=raw_dict.get("vendor_name"),
@@ -76,9 +65,15 @@ class OfferExtractionService:
             commodity_group_suggestion=raw_dict.get("commodity_group_suggestion"),
         )
 
+        self._logger.info(
+            "Offer extraction completed with %s order lines for file %s",
+            len(order_lines),
+            file.filename,
+        )
         return result
 
 
 def get_offer_extraction_service() -> OfferExtractionService:
+    """Provide OfferExtractionService with a configured OpenAI client."""
     client = OpenAIClient()
     return OfferExtractionService(openai_client=client)
