@@ -10,11 +10,15 @@ Case Study: Beschaffungstool mit Next.js (Frontend) und FastAPI (Backend).
 
 Frontend
 
+- npm install
 - npm run dev
 
 Backend
 
-- .\.venv\Scripts\activate.bat
+- python -m venv .venv
+- .\.venv\Scripts\Activate.ps1
+- pip install -r requirements.txt
+- populate .env - OPENAI_API_KEY
 - uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Challenge 1

@@ -261,7 +261,7 @@ export function RequestsOverview({ requests, error }: RequestsOverviewProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/requests/${request.id}`}>Edit</Link>
+                        <Link href={`/requests/${request.id}`}>Show</Link>
                       </Button>
                     </TableCell>
                   </TableRow>

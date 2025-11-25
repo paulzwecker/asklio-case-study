@@ -58,6 +58,24 @@ const parseNumber = (value: unknown): number => {
   return 0;
 };
 
+// Small loading dots component (three bouncing dots)
+const LoadingDots: React.FC = () => (
+  <span className="ml-1 inline-flex items-center gap-1">
+    <span
+      className="h-1.5 w-1.5 rounded-full bg-slate-700 animate-bounce"
+      style={{ animationDelay: '0s' }}
+    />
+    <span
+      className="h-1.5 w-1.5 rounded-full bg-slate-700 animate-bounce"
+      style={{ animationDelay: '0.15s' }}
+    />
+    <span
+      className="h-1.5 w-1.5 rounded-full bg-slate-700 animate-bounce"
+      style={{ animationDelay: '0.3s' }}
+    />
+  </span>
+);
+
 export const RequestForm: React.FC = () => {
   const router = useRouter();
 
@@ -86,6 +104,10 @@ export const RequestForm: React.FC = () => {
   const vendorRef = useRef<HTMLInputElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isFormDisabled = isSubmitting || isLaunching;
+  const isParsingOffer = parseState === 'loading';
+  const isUploadDisabled = isFormDisabled || isParsingOffer;
 
   const currencyFormatter = useMemo(
     () =>
@@ -130,14 +152,17 @@ export const RequestForm: React.FC = () => {
   };
 
   const handleAddLine = () => {
+    if (isFormDisabled) return;
     setOrderLines((prev) => [...prev, createEmptyLine(Date.now())]);
   };
 
   const handleRemoveLine = (index: number) => {
+    if (isFormDisabled) return;
     setOrderLines((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleChangeLine = (index: number, updated: OrderLine) => {
+    if (isFormDisabled) return;
     setOrderLines((prev) => prev.map((line, i) => (i === index ? updated : line)));
   };
 
@@ -223,36 +248,40 @@ export const RequestForm: React.FC = () => {
   };
 
   const handleOfferFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (isUploadDisabled) return;
     const file = event.target.files?.[0] ?? null;
     await parseOfferFile(file);
   };
 
   const handleFileUploadClick = () => {
-    if (isSubmitting) return;
+    if (isUploadDisabled) return;
     fileInputRef.current?.click();
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isUploadDisabled) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
     if (!isDragOver) setIsDragOver(true);
   };
 
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isUploadDisabled) return;
     event.preventDefault();
     setIsDragOver(true);
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (isUploadDisabled) return;
     event.preventDefault();
     setIsDragOver(false);
   };
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    if (isUploadDisabled) return;
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(false);
-    if (isSubmitting) return;
 
     const file = event.dataTransfer.files?.[0] ?? null;
     if (!file) return;
@@ -315,6 +344,8 @@ export const RequestForm: React.FC = () => {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isFormDisabled) return;
+
     setErrorMessage(null);
     setSuccessMessage(null);
 
@@ -356,193 +387,251 @@ export const RequestForm: React.FC = () => {
     }
   };
 
+  const submitLabel = isLaunching
+    ? 'Launching'
+    : isSubmitting
+    ? 'Submitting'
+    : 'Submit request';
+
   return (
     <>
-      <Card asChild className="shadow-sm">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <CardHeader>
-            <CardTitle>New procurement request</CardTitle>
-            <CardDescription>
-              Capture a new purchasing request. Upload an offer PDF to auto-fill vendor and line items.
-            </CardDescription>
-          </CardHeader>
+      <div className="relative">
+        <Card asChild className="shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <CardHeader>
+              <CardTitle>New procurement request</CardTitle>
+              <CardDescription>
+                Capture a new purchasing request. Upload an offer PDF to auto-fill vendor and line items.
+              </CardDescription>
+            </CardHeader>
 
-          <CardContent className="space-y-6">
-            {errorMessage && (
-              <Alert variant="destructive" ref={alertRef} tabIndex={-1}>
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{errorMessage}</AlertDescription>
-              </Alert>
-            )}
-            {successMessage && (
-              <Alert ref={alertRef} tabIndex={-1}>
-                <AlertTitle>Success</AlertTitle>
-                <AlertDescription>{successMessage}</AlertDescription>
-              </Alert>
-            )}
+            <CardContent className="space-y-6">
+              {errorMessage && (
+                <Alert variant="destructive" ref={alertRef} tabIndex={-1}>
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+              {successMessage && (
+                <Alert ref={alertRef} tabIndex={-1}>
+                  <AlertTitle>Success</AlertTitle>
+                  <AlertDescription>{successMessage}</AlertDescription>
+                </Alert>
+              )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>
-                  Requestor name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  ref={requestorRef}
-                  value={requestorName}
-                  onChange={(e) => setRequestorName(e.target.value)}
-                  placeholder="Jane Doe"
-                  required
-                />
-              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>
+                    Requestor name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    ref={requestorRef}
+                    value={requestorName}
+                    onChange={(e) => setRequestorName(e.target.value)}
+                    placeholder="Jane Doe"
+                    required
+                    disabled={isFormDisabled}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>
-                  Department <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  ref={departmentRef}
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="Marketing, IT, ..."
-                  required
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label>
+                    Department <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    ref={departmentRef}
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="Marketing, IT, ..."
+                    required
+                    disabled={isFormDisabled}
+                  />
+                </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label>
-                  Title / Short description <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  ref={titleRef}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. New laptop for design team"
-                  required
-                />
-              </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>
+                    Title / Short description <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    ref={titleRef}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. New laptop for design team"
+                    required
+                    disabled={isFormDisabled}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>
-                  Vendor name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  ref={vendorRef}
-                  value={vendorName}
-                  onChange={(e) => setVendorName(e.target.value)}
-                  placeholder="Apple, Example GmbH, ..."
-                  required
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label>
+                    Vendor name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    ref={vendorRef}
+                    value={vendorName}
+                    onChange={(e) => setVendorName(e.target.value)}
+                    placeholder="Apple, Example GmbH, ..."
+                    required
+                    disabled={isFormDisabled}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Vendor VAT ID</Label>
-                <Input
-                  value={vendorVatId}
-                  onChange={(e) => setVendorVatId(e.target.value)}
-                  placeholder="DE123456789"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label>Vendor VAT ID</Label>
+                  <Input
+                    value={vendorVatId}
+                    onChange={(e) => setVendorVatId(e.target.value)}
+                    placeholder="DE123456789"
+                    disabled={isFormDisabled}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>Commodity group</Label>
-                <Select
-                  value={commodityGroup || undefined}
-                  onValueChange={(value) => setCommodityGroup(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Auto (backend suggestion possible)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMODITY_GROUPS.map((cg) => (
-                      <SelectItem key={cg} value={cg}>
-                        {cg}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-slate-500">
-                  Leave empty to let the backend suggest a commodity group.
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <Label>Commodity group</Label>
+                  <Select
+                    value={commodityGroup || undefined}
+                    onValueChange={(value) => setCommodityGroup(value)}
+                    disabled={isFormDisabled}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Auto (backend suggestion possible)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMODITY_GROUPS.map((cg) => (
+                        <SelectItem key={cg} value={cg}>
+                          {cg}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500">
+                    Leave empty to let the backend suggest a commodity group.
+                  </p>
+                </div>
 
-              <div className="space-y-2 md:col-span-2 mt-5">
-                <Label>Offer PDF (optional)</Label>
+                {/* Upload section with its own parsing overlay */}
+                <div className="space-y-2 md:col-span-2 mt-5 relative">
+                  <Label>Offer PDF (optional)</Label>
 
-                {/* Hidden native input */}
-                <Input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleOfferFileChange}
-                  disabled={isSubmitting}
-                  className="hidden"
-                />
+                  {/* Hidden native input */}
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleOfferFileChange}
+                    disabled={isUploadDisabled}
+                    className="hidden"
+                  />
 
-                {/* Clickable + droppable area */}
-                <div
-                  onClick={handleFileUploadClick}
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-sm transition-colors cursor-pointer ${
-                    isDragOver
-                      ? 'border-primary bg-primary/5'
-                      : 'border-slate-300 hover:border-primary/70 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="font-medium text-slate-800">
-                    Click to upload a PDF or drag &amp; drop it here
-                  </span>
-                  <span className="mt-1 text-xs text-slate-500">
-                    Only PDF files are supported. We’ll auto-extract vendor and line items.
-                  </span>
-                  {offerFile && (
-                    <span className="mt-2 text-xs text-slate-600">
-                      Selected: <span className="font-medium">{offerFile.name}</span>
+                  {/* Clickable + droppable area */}
+                  <div
+                    onClick={handleFileUploadClick}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-sm transition-colors ${
+                      isUploadDisabled
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                        : isDragOver
+                        ? 'cursor-pointer border-primary bg-primary/5'
+                        : 'cursor-pointer border-slate-300 hover:border-primary/70 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="font-medium text-slate-800">
+                      Click to upload a PDF or drag &amp; drop it here
                     </span>
+                    <span className="mt-1 text-xs text-slate-500">
+                      Only PDF files are supported. We’ll auto-extract vendor and line items.
+                    </span>
+                    {offerFile && (
+                      <span className="mt-2 text-xs text-slate-600">
+                        Selected: <span className="font-medium">{offerFile.name}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    {parseState === 'loading' && (
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        Parsing
+                        <LoadingDots />
+                      </Badge>
+                    )}
+                    {parseState === 'success' && <Badge variant="secondary">Parsed</Badge>}
+                    {parseState === 'error' && (
+                      <Badge variant="destructive" className="text-xs">
+                        Parse failed
+                      </Badge>
+                    )}
+                    {parseMessage && <span className="text-slate-500">{parseMessage}</span>}
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    Upload an offer from the vendor to auto-extract items and totals (calls /offers/parse).
+                  </p>
+
+                  {/* Upload-only overlay while parsing */}
+                  {isParsingOffer && (
+                    <div className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center rounded-md bg-white/70 backdrop-blur-sm">
+                      <div className="flex flex-col items-center gap-2 text-xs text-slate-800">
+                        <div className="h-5 w-5 rounded-full border-2 border-slate-300 border-t-primary animate-spin" />
+                        <div className="font-medium">
+                          Reading your offer
+                          <LoadingDots />
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                  {parseState === 'loading' && <Badge variant="secondary">Parsing...</Badge>}
-                  {parseState === 'success' && <Badge variant="secondary">Parsed</Badge>}
-                  {parseState === 'error' && (
-                    <Badge variant="destructive" className="text-xs">
-                      Parse failed
-                    </Badge>
-                  )}
-                  {parseMessage && <span className="text-slate-500">{parseMessage}</span>}
-                </div>
-
-                <p className="text-xs text-slate-500">
-                  Upload an offer from the vendor to auto-extract items and totals (calls /offers/parse).
-                </p>
               </div>
+
+              <Separator />
+
+              <RequestLinesTable
+                lines={orderLines}
+                onAddLine={handleAddLine}
+                onRemoveLine={handleRemoveLine}
+                onChangeLine={handleChangeLine}
+              />
+            </CardContent>
+
+            <CardFooter className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-2 text-sm text-slate-700">
+                <span className="font-medium">Total cost (net):</span>
+                <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
+              </div>
+              <Button
+                type="submit"
+                disabled={isFormDisabled}
+                className={isFormDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}
+              >
+                <span className="flex items-center">
+                  {submitLabel}
+                  {(isSubmitting || isLaunching) && <LoadingDots />}
+                </span>
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+
+        {/* Full-form overlay while submitting / launching */}
+        {isFormDisabled && (
+          <div className="pointer-events-auto absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-white/60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3 text-sm text-slate-800">
+              <div className="h-8 w-8 rounded-full border-2 border-slate-300 border-t-primary animate-spin" />
+              <div className="font-medium">
+                {isLaunching ? 'Launching your request' : 'Submitting your request'}
+                <LoadingDots />
+              </div>
+              <p className="text-xs text-slate-500">
+                Please hold on, we’re processing your request.
+              </p>
             </div>
+          </div>
+        )}
+      </div>
 
-            <Separator />
-
-            <RequestLinesTable
-              lines={orderLines}
-              onAddLine={handleAddLine}
-              onRemoveLine={handleRemoveLine}
-              onChangeLine={handleChangeLine}
-            />
-          </CardContent>
-
-          <CardFooter className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-2 text-sm text-slate-700">
-              <span className="font-medium">Total cost (net):</span>
-              <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
-            </div>
-            <Button type="submit" disabled={isSubmitting} className='cursor-pointer'>
-              {isSubmitting ? 'Submitting...' : 'Submit request'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    
       {/* 🚀 Rocket overlay */}
       <RocketLaunch isVisible={isLaunching} onComplete={handleRocketComplete} />
     </>
