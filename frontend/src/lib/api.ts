@@ -103,7 +103,7 @@ export async function listProcurementRequests(
   if (filters?.search) params.set('search', filters.search);
 
   const response = await fetch(buildUrl('/requests', params), {
-    next: { revalidate: 5 },
+    cache: 'no-store',
   });
 
   return handleApiResponse<ProcurementRequest[]>(response);
@@ -113,7 +113,7 @@ export async function getProcurementRequest(
   id: string
 ): Promise<ProcurementRequest> {
   const response = await fetch(buildUrl(`/requests/${encodeURIComponent(id)}`), {
-    next: { revalidate: 5 },
+    cache: 'no-store',
   });
 
   return handleApiResponse<ProcurementRequest>(response);

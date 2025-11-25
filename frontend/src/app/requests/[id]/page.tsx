@@ -18,7 +18,7 @@ interface RequestDetailPageProps {
 }
 
 export default async function RequestDetailPage({ params }: RequestDetailPageProps) {
-  const { id } = params;
+  const { id } = await params
 
   let request: ProcurementRequest | null = null;
   let fetchError: unknown = null;

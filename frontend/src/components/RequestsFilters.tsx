@@ -2,8 +2,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import type { RequestStatus } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,6 +18,12 @@ interface RequestsFiltersProps {
   status?: RequestStatus;
   search?: string;
   department?: string;
+  onApply: (filters: {
+    status?: RequestStatus;
+    search?: string;
+    department?: string;
+  }) => void;
+  onReset: () => void;
 }
 
 const statusOptions: { label: string; value: RequestStatus | 'all' }[] = [
@@ -32,63 +37,39 @@ export function RequestsFilters({
   status,
   search,
   department,
+  onApply,
+  onReset,
 }: RequestsFiltersProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const [statusValue, setStatusValue] = useState<RequestStatus | 'all'>(status ?? 'all');
   const [searchValue, setSearchValue] = useState(search ?? '');
   const [departmentValue, setDepartmentValue] = useState(department ?? '');
-  const [isPending, startTransition] = useTransition();
 
-  const updateQuery = (updates: {
-    status?: RequestStatus;
-    search?: string;
-    department?: string;
-  }) => {
-    const params = new URLSearchParams(searchParams.toString());
+  useEffect(() => {
+    setStatusValue(status ?? 'all');
+  }, [status]);
 
-    if (updates.status) {
-      params.set('status', updates.status);
-    } else {
-      params.delete('status');
-    }
+  useEffect(() => {
+    setSearchValue(search ?? '');
+  }, [search]);
 
-    if (updates.search !== undefined) {
-      if (updates.search) {
-        params.set('search', updates.search);
-      } else {
-        params.delete('search');
-      }
-    }
-
-    if (updates.department !== undefined) {
-      if (updates.department) {
-        params.set('department', updates.department);
-      } else {
-        params.delete('department');
-      }
-    }
-
-    const query = params.toString();
-    const url = query ? `?${query}` : '.';
-
-    startTransition(() => {
-      router.push(url, { scroll: false });
-    });
-  };
-
-  const handleStatusChange = (value: RequestStatus | 'all') => {
-    updateQuery({ status: value === 'all' ? undefined : value });
-  };
+  useEffect(() => {
+    setDepartmentValue(department ?? '');
+  }, [department]);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    updateQuery({ search: searchValue.trim(), department: departmentValue.trim() });
+    onApply({
+      status: statusValue === 'all' ? undefined : statusValue,
+      search: searchValue.trim() || undefined,
+      department: departmentValue.trim() || undefined,
+    });
   };
 
   const handleReset = () => {
+    setStatusValue('all');
     setSearchValue('');
     setDepartmentValue('');
-    updateQuery({ status: undefined, search: undefined, department: undefined });
+    onReset();
   };
 
   return (
@@ -98,9 +79,9 @@ export function RequestsFilters({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Select
-          value={status ?? 'all'}
+          value={statusValue}
           onValueChange={(value) =>
-            handleStatusChange(value as RequestStatus | 'all')
+            setStatusValue(value as RequestStatus | 'all')
           }
         >
           <SelectTrigger className="w-full sm:w-[200px]">
@@ -131,10 +112,8 @@ export function RequestsFilters({
       </div>
 
       <div className="flex items-center gap-2 self-start sm:self-center">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Updating...' : 'Apply'}
-        </Button>
-        <Button type="button" variant="outline" onClick={handleReset} disabled={isPending}>
+        <Button type="submit" className=' cursor-pointer'>Apply</Button>
+        <Button type="button" className=' cursor-pointer' variant="outline" onClick={handleReset}>
           Reset
         </Button>
       </div>

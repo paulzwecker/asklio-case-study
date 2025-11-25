@@ -27,12 +27,18 @@ export default function RootLayout({
                 Procurement
               </div>
             </div>
-            <nav className="space-y-1 text-sm">
-              <Link
+            <nav className="space-y-1 text-sm font-medium">
+              {/* <Link
                 href="/"
                 className="block rounded-md px-2 py-1 text-slate-700 hover:bg-slate-100"
               >
                 Dashboard
+              </Link> */}
+              <Link
+                href="/requests"
+                className="block rounded-md px-2 py-1 text-slate-700 hover:bg-slate-100"
+              >
+                All requests
               </Link>
               <Link
                 href="/request/new"
@@ -40,16 +46,10 @@ export default function RootLayout({
               >
                 New request
               </Link>
-              <Link
-                href="/requests"
-                className="block rounded-md px-2 py-1 text-slate-700 hover:bg-slate-100"
-              >
-                All requests
-              </Link>
             </nav>
           </aside>
           <main className="flex-1">
-            <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
               {children}
             </div>
           </main>

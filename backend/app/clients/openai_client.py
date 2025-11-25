@@ -142,7 +142,7 @@ class OpenAIClient:
             Example: write 2100, not "€2.100,00" or "2100 EUR".
             - Extract ALL relevant line items (products, services, shipping) that have a quantity and price.
             - If the document shows multiple alternative products/variants, include each as a separate order line.
-            - If the unit is not explicitly mentioned, set "unit" to "Stk".
+            - If the unit is not explicitly mentioned, set "unit" to "Pcs".
             - If the line total is not explicitly mentioned, compute "total_price" as unit_price * amount.
             - If a field is truly missing in the document, set it to null.
             - For "requestor_name": if the document clearly shows a customer addressee or contact person

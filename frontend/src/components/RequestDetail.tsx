@@ -52,9 +52,9 @@ export function RequestDetail({ request }: RequestDetailProps) {
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-1">
           <Link href="/requests" className="text-sm text-slate-600 hover:text-slate-800">
-            Back to requests
+            &larr; Back to requests
           </Link>
-          <h1 className="text-2xl font-semibold text-slate-900">{currentRequest.title}</h1>
+          <h1 className="mt-5 text-2xl font-semibold text-slate-900">{currentRequest.title}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <StatusBadge status={currentRequest.status} />
             <span className="font-mono text-xs">ID {currentRequest.id}</span>
@@ -73,8 +73,19 @@ export function RequestDetail({ request }: RequestDetailProps) {
 
       <Card className="shadow-sm">
         <CardHeader>
+          <div className="flex w-full justify-between">
+            <div>
           <CardTitle className="text-base">Request metadata</CardTitle>
-          <CardDescription>Core information about this procurement.</CardDescription>
+          <CardDescription>Core information about this procurement.</CardDescription></div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">Status</p>
+              <RequestStatusControl
+                requestId={currentRequest.id}
+                status={currentRequest.status}
+                onUpdated={setCurrentRequest}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <MetadataItem label="Requestor" value={currentRequest.requestor_name} />
@@ -85,14 +96,6 @@ export function RequestDetail({ request }: RequestDetailProps) {
             label="Commodity group"
             value={currentRequest.commodity_group || 'Pending classification'}
           />
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Status</p>
-            <RequestStatusControl
-              requestId={currentRequest.id}
-              status={currentRequest.status}
-              onUpdated={setCurrentRequest}
-            />
-          </div>
           <MetadataItem label="Created" value={formatDate(currentRequest.created_at)} />
           <MetadataItem label="Last updated" value={formatDate(currentRequest.updated_at)} />
         </CardContent>

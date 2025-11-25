@@ -447,7 +447,7 @@ export const RequestForm: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 md:col-span-2 mt-5">
               <Label>Offer PDF (optional)</Label>
 
               {/* Hidden native input */}
@@ -518,7 +518,7 @@ export const RequestForm: React.FC = () => {
             <span className="font-medium">Total cost (net):</span>
             <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
           </div>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} className='cursor-pointer'>
             {isSubmitting ? 'Submitting...' : 'Submit request'}
           </Button>
         </CardFooter>
