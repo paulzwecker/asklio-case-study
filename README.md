@@ -8,6 +8,15 @@ Case Study: Beschaffungstool mit Next.js (Frontend) und FastAPI (Backend).
 - `backend/` – FastAPI API (Request-Handling, PDF-Parsing, Commodity Logic)
 - `docs/` – Case-Study-Unterlagen (z.B. Angebots-PDFs)
 
+Frontend
+
+- npm run dev
+
+Backend
+
+- .\.venv\Scripts\activate.bat
+- uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
 # Challenge 1
 
 Please organize, design, test, and deploy your code (locally on your machine is fine) as if it were going into production. Then send us a link to the hosted repository (e.g. Github, Bitbucket...).

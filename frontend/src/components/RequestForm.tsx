@@ -34,6 +34,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { RocketLaunch } from '@/components/RocketLaunch';
 
 type ParseState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -74,6 +75,10 @@ export const RequestForm: React.FC = () => {
   const [parseState, setParseState] = useState<ParseState>('idle');
   const [parseMessage, setParseMessage] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // 🚀 rocket launch state
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [pendingRedirectId, setPendingRedirectId] = useState<string | null>(null);
 
   const requestorRef = useRef<HTMLInputElement>(null);
   const departmentRef = useRef<HTMLInputElement>(null);
@@ -295,6 +300,19 @@ export const RequestForm: React.FC = () => {
     setParseMessage(null);
   };
 
+  // 🚀 When the rocket animation finishes, navigate
+  const handleRocketComplete = () => {
+    const id = pendingRedirectId;
+    setIsLaunching(false);
+    resetForm();
+
+    if (id) {
+      router.push(`/requests/${id}`);
+    } else {
+      router.push('/requests');
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -313,18 +331,17 @@ export const RequestForm: React.FC = () => {
       const payload = buildPayload();
       const created = await createProcurementRequest(payload);
 
-      // Try to get the id in a defensive way
       const createdId = (created as any)?.id;
 
       if (createdId) {
-        setSuccessMessage(`Request created (ID: ${createdId}). Redirecting...`);
-        resetForm();
-        router.push(`/requests/${createdId}`);
+        setPendingRedirectId(createdId);
+        setSuccessMessage(`Request created (ID: ${createdId}). Launching...`);
+        setIsLaunching(true); // start rocket animation
       } else {
         console.warn('createProcurementRequest result has no id:', created);
-        setSuccessMessage('Request created. Redirecting to all requests...');
-        resetForm();
-        router.push('/requests');
+        setPendingRedirectId(null);
+        setSuccessMessage('Request created. Launching overview...');
+        setIsLaunching(true);
       }
     } catch (error) {
       console.error('Submitting the request failed', error);
@@ -340,189 +357,194 @@ export const RequestForm: React.FC = () => {
   };
 
   return (
-    <Card asChild className="shadow-sm">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <CardHeader>
-          <CardTitle>New procurement request</CardTitle>
-          <CardDescription>
-            Capture a new purchasing request. Upload an offer PDF to auto-fill vendor and line items.
-          </CardDescription>
-        </CardHeader>
+    <>
+      <Card asChild className="shadow-sm">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <CardHeader>
+            <CardTitle>New procurement request</CardTitle>
+            <CardDescription>
+              Capture a new purchasing request. Upload an offer PDF to auto-fill vendor and line items.
+            </CardDescription>
+          </CardHeader>
 
-        <CardContent className="space-y-6">
-          {errorMessage && (
-            <Alert variant="destructive" ref={alertRef} tabIndex={-1}>
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{errorMessage}</AlertDescription>
-            </Alert>
-          )}
-          {successMessage && (
-            <Alert ref={alertRef} tabIndex={-1}>
-              <AlertTitle>Success</AlertTitle>
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          )}
+          <CardContent className="space-y-6">
+            {errorMessage && (
+              <Alert variant="destructive" ref={alertRef} tabIndex={-1}>
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+            {successMessage && (
+              <Alert ref={alertRef} tabIndex={-1}>
+                <AlertTitle>Success</AlertTitle>
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>
-                Requestor name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                ref={requestorRef}
-                value={requestorName}
-                onChange={(e) => setRequestorName(e.target.value)}
-                placeholder="Jane Doe"
-                required
-              />
-            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>
+                  Requestor name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  ref={requestorRef}
+                  value={requestorName}
+                  onChange={(e) => setRequestorName(e.target.value)}
+                  placeholder="Jane Doe"
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>
-                Department <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                ref={departmentRef}
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Marketing, IT, ..."
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>
+                  Department <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  ref={departmentRef}
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  placeholder="Marketing, IT, ..."
+                  required
+                />
+              </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>
-                Title / Short description <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                ref={titleRef}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. New laptop for design team"
-                required
-              />
-            </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>
+                  Title / Short description <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  ref={titleRef}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. New laptop for design team"
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>
-                Vendor name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                ref={vendorRef}
-                value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
-                placeholder="Apple, Example GmbH, ..."
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>
+                  Vendor name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  ref={vendorRef}
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                  placeholder="Apple, Example GmbH, ..."
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Vendor VAT ID</Label>
-              <Input
-                value={vendorVatId}
-                onChange={(e) => setVendorVatId(e.target.value)}
-                placeholder="DE123456789"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>Vendor VAT ID</Label>
+                <Input
+                  value={vendorVatId}
+                  onChange={(e) => setVendorVatId(e.target.value)}
+                  placeholder="DE123456789"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Commodity group</Label>
-              <Select
-                value={commodityGroup || undefined}
-                onValueChange={(value) => setCommodityGroup(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Auto (backend suggestion possible)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMODITY_GROUPS.map((cg) => (
-                    <SelectItem key={cg} value={cg}>
-                      {cg}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-slate-500">
-                Leave empty to let the backend suggest a commodity group.
-              </p>
-            </div>
+              <div className="space-y-2">
+                <Label>Commodity group</Label>
+                <Select
+                  value={commodityGroup || undefined}
+                  onValueChange={(value) => setCommodityGroup(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Auto (backend suggestion possible)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMODITY_GROUPS.map((cg) => (
+                      <SelectItem key={cg} value={cg}>
+                        {cg}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500">
+                  Leave empty to let the backend suggest a commodity group.
+                </p>
+              </div>
 
-            <div className="space-y-2 md:col-span-2 mt-5">
-              <Label>Offer PDF (optional)</Label>
+              <div className="space-y-2 md:col-span-2 mt-5">
+                <Label>Offer PDF (optional)</Label>
 
-              {/* Hidden native input */}
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                onChange={handleOfferFileChange}
-                disabled={isSubmitting}
-                className="hidden"
-              />
+                {/* Hidden native input */}
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleOfferFileChange}
+                  disabled={isSubmitting}
+                  className="hidden"
+                />
 
-              {/* Clickable + droppable area */}
-              <div
-                onClick={handleFileUploadClick}
-                onDragOver={handleDragOver}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-sm transition-colors cursor-pointer ${
-                  isDragOver
-                    ? 'border-primary bg-primary/5'
-                    : 'border-slate-300 hover:border-primary/70 hover:bg-slate-50'
-                }`}
-              >
-                <span className="font-medium text-slate-800">
-                  Click to upload a PDF or drag &amp; drop it here
-                </span>
-                <span className="mt-1 text-xs text-slate-500">
-                  Only PDF files are supported. We’ll auto-extract vendor and line items.
-                </span>
-                {offerFile && (
-                  <span className="mt-2 text-xs text-slate-600">
-                    Selected: <span className="font-medium">{offerFile.name}</span>
+                {/* Clickable + droppable area */}
+                <div
+                  onClick={handleFileUploadClick}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-sm transition-colors cursor-pointer ${
+                    isDragOver
+                      ? 'border-primary bg-primary/5'
+                      : 'border-slate-300 hover:border-primary/70 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="font-medium text-slate-800">
+                    Click to upload a PDF or drag &amp; drop it here
                   </span>
-                )}
-              </div>
+                  <span className="mt-1 text-xs text-slate-500">
+                    Only PDF files are supported. We’ll auto-extract vendor and line items.
+                  </span>
+                  {offerFile && (
+                    <span className="mt-2 text-xs text-slate-600">
+                      Selected: <span className="font-medium">{offerFile.name}</span>
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                {parseState === 'loading' && <Badge variant="secondary">Parsing...</Badge>}
-                {parseState === 'success' && <Badge variant="secondary">Parsed</Badge>}
-                {parseState === 'error' && (
-                  <Badge variant="destructive" className="text-xs">
-                    Parse failed
-                  </Badge>
-                )}
-                {parseMessage && <span className="text-slate-500">{parseMessage}</span>}
-              </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  {parseState === 'loading' && <Badge variant="secondary">Parsing...</Badge>}
+                  {parseState === 'success' && <Badge variant="secondary">Parsed</Badge>}
+                  {parseState === 'error' && (
+                    <Badge variant="destructive" className="text-xs">
+                      Parse failed
+                    </Badge>
+                  )}
+                  {parseMessage && <span className="text-slate-500">{parseMessage}</span>}
+                </div>
 
-              <p className="text-xs text-slate-500">
-                Upload an offer from the vendor to auto-extract items and totals (calls /offers/parse).
-              </p>
+                <p className="text-xs text-slate-500">
+                  Upload an offer from the vendor to auto-extract items and totals (calls /offers/parse).
+                </p>
+              </div>
             </div>
-          </div>
 
-          <Separator />
+            <Separator />
 
-          <RequestLinesTable
-            lines={orderLines}
-            onAddLine={handleAddLine}
-            onRemoveLine={handleRemoveLine}
-            onChangeLine={handleChangeLine}
-          />
-        </CardContent>
+            <RequestLinesTable
+              lines={orderLines}
+              onAddLine={handleAddLine}
+              onRemoveLine={handleRemoveLine}
+              onChangeLine={handleChangeLine}
+            />
+          </CardContent>
 
-        <CardFooter className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-700">
-            <span className="font-medium">Total cost (net):</span>
-            <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
-          </div>
-          <Button type="submit" disabled={isSubmitting} className='cursor-pointer'>
-            {isSubmitting ? 'Submitting...' : 'Submit request'}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+          <CardFooter className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <span className="font-medium">Total cost (net):</span>
+              <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
+            </div>
+            <Button type="submit" disabled={isSubmitting} className='cursor-pointer'>
+              {isSubmitting ? 'Submitting...' : 'Submit request'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    
+      {/* 🚀 Rocket overlay */}
+      <RocketLaunch isVisible={isLaunching} onComplete={handleRocketComplete} />
+    </>
   );
 };
