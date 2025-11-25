@@ -18,10 +18,11 @@ class OfferDocument(BaseModel):
 
 
 class OfferExtractionResult(BaseModel):
+    requestor_name: Optional[str] = None  # NEW
     vendor_name: Optional[str] = None
     vendor_vat_id: Optional[str] = None
     department: Optional[str] = None
     title: Optional[str] = None
-    order_lines: List[OrderLine] = Field(default_factory=list)
+    order_lines: List[OrderLine] = []
     total_cost: Optional[condecimal(max_digits=14, decimal_places=2)] = None
     commodity_group_suggestion: Optional[str] = None

@@ -46,6 +46,17 @@ const createEmptyLine = (seed: number): OrderLine => ({
   total_price: 0,
 });
 
+// Helper to safely parse numbers, including "1,23" style inputs
+const parseNumber = (value: unknown): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const normalized = value.replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
 export const RequestForm: React.FC = () => {
   const router = useRouter();
 
@@ -62,12 +73,14 @@ export const RequestForm: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [parseState, setParseState] = useState<ParseState>('idle');
   const [parseMessage, setParseMessage] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const requestorRef = useRef<HTMLInputElement>(null);
   const departmentRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const vendorRef = useRef<HTMLInputElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currencyFormatter = useMemo(
     () =>
@@ -132,10 +145,34 @@ export const RequestForm: React.FC = () => {
   );
 
   const applyOfferExtraction = (result: OfferExtractionResult) => {
-    if (result.vendor_name && !vendorName) setVendorName(result.vendor_name);
-    if (result.vendor_vat_id) setVendorVatId(result.vendor_vat_id);
-    if (result.department && !department) setDepartment(result.department);
-    if (result.title && !title) setTitle(result.title);
+    // Requestor name: use model value if present, otherwise "Unknown" (if still empty)
+    if (!requestorName) {
+      const fromModel = result.requestor_name ?? null;
+      setRequestorName(fromModel && fromModel.trim().length > 0 ? fromModel : 'Unknown');
+    }
+
+    // Vendor name: only set if model has it and user hasn’t typed anything
+    if (result.vendor_name && !vendorName) {
+      setVendorName(result.vendor_name);
+    }
+
+    // VAT: optional, only set if present
+    if (result.vendor_vat_id) {
+      setVendorVatId(result.vendor_vat_id);
+    }
+
+    // Department: use model value if present, otherwise "Unknown" (if still empty)
+    if (!department) {
+      const fromModel = result.department ?? null;
+      setDepartment(fromModel && fromModel.trim().length > 0 ? fromModel : 'Unknown');
+    }
+
+    // Title: only set if model has it and user hasn’t typed anything
+    if (result.title && !title) {
+      setTitle(result.title);
+    }
+
+    // Commodity group: only set if suggestion is one of our known groups and we haven't chosen one yet
     if (
       result.commodity_group_suggestion &&
       COMMODITY_GROUPS.includes(result.commodity_group_suggestion) &&
@@ -143,6 +180,8 @@ export const RequestForm: React.FC = () => {
     ) {
       setCommodityGroup(result.commodity_group_suggestion);
     }
+
+    // Order lines: only overwrite if user hasn't entered anything yet
     if (
       Array.isArray(result.order_lines) &&
       result.order_lines.length > 0 &&
@@ -152,8 +191,7 @@ export const RequestForm: React.FC = () => {
     }
   };
 
-  const handleOfferFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
+  const parseOfferFile = async (file: File | null) => {
     setOfferFile(file);
     setParseMessage(null);
 
@@ -179,6 +217,50 @@ export const RequestForm: React.FC = () => {
     }
   };
 
+  const handleOfferFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    await parseOfferFile(file);
+  };
+
+  const handleFileUploadClick = () => {
+    if (isSubmitting) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+    if (isSubmitting) return;
+
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setParseState('error');
+      setParseMessage('Only PDF files are supported.');
+      return;
+    }
+
+    await parseOfferFile(file);
+  };
+
   const buildPayload = (): CreateProcurementRequestPayload => ({
     requestor_name: requestorName.trim(),
     title: title.trim(),
@@ -191,13 +273,13 @@ export const RequestForm: React.FC = () => {
         ...(line.id ? { id: line.id } : {}),
         position_description: line.position_description.trim(),
         unit: line.unit.trim(),
-        unit_price: Number(line.unit_price) || 0,
-        amount: Number(line.amount) || 0,
-        total_price: Number(line.total_price) || 0,
+        unit_price: parseNumber(line.unit_price),
+        amount: parseNumber(line.amount),
+        total_price: parseNumber(line.total_price),
       };
       return sanitized;
     }),
-    total_cost: Number(totalCost.toFixed(2)),
+    total_cost: parseNumber(totalCost.toFixed(2)),
   });
 
   const resetForm = () => {
@@ -230,9 +312,20 @@ export const RequestForm: React.FC = () => {
     try {
       const payload = buildPayload();
       const created = await createProcurementRequest(payload);
-      setSuccessMessage(`Request created (ID: ${created.id}). Redirecting...`);
-      resetForm();
-      router.push(`/requests/${created.id}`);
+
+      // Try to get the id in a defensive way
+      const createdId = (created as any)?.id;
+
+      if (createdId) {
+        setSuccessMessage(`Request created (ID: ${createdId}). Redirecting...`);
+        resetForm();
+        router.push(`/requests/${createdId}`);
+      } else {
+        console.warn('createProcurementRequest result has no id:', created);
+        setSuccessMessage('Request created. Redirecting to all requests...');
+        resetForm();
+        router.push('/requests');
+      }
     } catch (error) {
       console.error('Submitting the request failed', error);
       const message =
@@ -356,14 +449,44 @@ export const RequestForm: React.FC = () => {
 
             <div className="space-y-2 md:col-span-2">
               <Label>Offer PDF (optional)</Label>
+
+              {/* Hidden native input */}
               <Input
+                ref={fileInputRef}
                 type="file"
                 accept="application/pdf"
                 onChange={handleOfferFileChange}
                 disabled={isSubmitting}
+                className="hidden"
               />
+
+              {/* Clickable + droppable area */}
+              <div
+                onClick={handleFileUploadClick}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-sm transition-colors cursor-pointer ${
+                  isDragOver
+                    ? 'border-primary bg-primary/5'
+                    : 'border-slate-300 hover:border-primary/70 hover:bg-slate-50'
+                }`}
+              >
+                <span className="font-medium text-slate-800">
+                  Click to upload a PDF or drag &amp; drop it here
+                </span>
+                <span className="mt-1 text-xs text-slate-500">
+                  Only PDF files are supported. We’ll auto-extract vendor and line items.
+                </span>
+                {offerFile && (
+                  <span className="mt-2 text-xs text-slate-600">
+                    Selected: <span className="font-medium">{offerFile.name}</span>
+                  </span>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                {offerFile && <span className="font-medium">Selected: {offerFile.name}</span>}
                 {parseState === 'loading' && <Badge variant="secondary">Parsing...</Badge>}
                 {parseState === 'success' && <Badge variant="secondary">Parsed</Badge>}
                 {parseState === 'error' && (
@@ -373,6 +496,7 @@ export const RequestForm: React.FC = () => {
                 )}
                 {parseMessage && <span className="text-slate-500">{parseMessage}</span>}
               </div>
+
               <p className="text-xs text-slate-500">
                 Upload an offer from the vendor to auto-extract items and totals (calls /offers/parse).
               </p>
@@ -391,7 +515,7 @@ export const RequestForm: React.FC = () => {
 
         <CardFooter className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-sm text-slate-700">
-            <span className="font-medium">Total cost:</span>
+            <span className="font-medium">Total cost (net):</span>
             <Badge variant="secondary">{currencyFormatter.format(totalCost || 0)}</Badge>
           </div>
           <Button type="submit" disabled={isSubmitting}>

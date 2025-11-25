@@ -13,7 +13,7 @@ class InMemoryRequestRepository(RequestRepository):
 
     def __init__(self) -> None:
         self._store: Dict[UUID, ProcurementRequest] = {}
-        self._logger = logging.getLogger("app.requests")
+        self._logger = logging.getLogger("app")
 
     def list(
         self,

@@ -10,7 +10,7 @@ from app.models.status import RequestStatus
 from app.services.request_service import RequestService, get_request_service
 
 router = APIRouter(prefix="/requests", tags=["requests"])
-logger = logging.getLogger("app.requests")
+logger = logging.getLogger("app")
 
 
 class StatusUpdatePayload(BaseModel):

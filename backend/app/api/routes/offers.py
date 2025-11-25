@@ -9,7 +9,7 @@ from app.services.offer_extraction_service import (
 )
 
 router = APIRouter(prefix="/offers", tags=["offers"])
-logger = logging.getLogger("app.offers")
+logger = logging.getLogger("app")
 
 
 @router.post(

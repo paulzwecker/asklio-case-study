@@ -1,14 +1,15 @@
 # app/models/order_line.py
 
 from typing import Optional
+from pydantic import BaseModel, condecimal
 
-from pydantic import BaseModel, condecimal, PositiveInt
-
+Price = condecimal(max_digits=12, decimal_places=2, ge=0)
+Quantity = condecimal(max_digits=12, decimal_places=3, gt=0)
 
 class OrderLine(BaseModel):
     id: Optional[int] = None
     position_description: str
-    unit_price: condecimal(max_digits=12, decimal_places=2)
-    amount: PositiveInt
+    unit_price: Price
+    amount: Quantity
     unit: str
-    total_price: condecimal(max_digits=12, decimal_places=2)
+    total_price: Price

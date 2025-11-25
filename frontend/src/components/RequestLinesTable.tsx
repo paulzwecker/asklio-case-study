@@ -118,7 +118,7 @@ export const RequestLinesTable: React.FC<RequestLinesTableProps> = ({
                     <Input
                       type="number"
                       min={0}
-                      step="1"
+                      step="0.01"
                       value={line.amount ?? 0}
                       onChange={(e) =>
                         handleFieldChange(index, 'amount', e.target.value)

@@ -24,7 +24,7 @@ class RequestService:
     ) -> None:
         self._repo = repository
         self._commodity_service = commodity_service
-        self._logger = logging.getLogger("app.requests")
+        self._logger = logging.getLogger("app")
 
     def list_requests(
         self,
